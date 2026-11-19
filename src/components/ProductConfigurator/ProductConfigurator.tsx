@@ -101,9 +101,14 @@ const calculateColorColumns = (
   containerWidth: number,
   swatchSize: number = 36,
   gap: number = 8,
+  totalOptions: number = 0,
 ): number => {
-  const columns = Math.floor((containerWidth + gap) / (swatchSize + gap));
-  return Math.max(1, columns);
+  if (containerWidth <= 0 || swatchSize <= 0) return 1;
+
+  const maxColumns = Math.floor((containerWidth + gap) / (swatchSize + gap));
+  const columns = Math.min(Math.max(1, maxColumns), totalOptions || maxColumns);
+
+  return columns;
 };
 
 // ============================================================================
@@ -200,7 +205,8 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
     const handleResize = () => {
       if (colorPickerRef.current) {
         const width = colorPickerRef.current.offsetWidth;
-        const cols = calculateColorColumns(width);
+        const totalOptions = colorPickerRef.current.children.length;
+        const cols = calculateColorColumns(width, 36, 8, totalOptions);
         colorPickerRef.current.style.setProperty('--color-columns', cols.toString());
       }
     };
