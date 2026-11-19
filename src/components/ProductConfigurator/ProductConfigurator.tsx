@@ -901,7 +901,13 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
 
           <div className={`price-display ${isPriceLoading ? 'price-loading' : ''}`}>
             <div className="price-label">Total Price</div>
-            <div className="price-value">{formattedTotal}</div>
+            <div className="price-value">
+              {isPriceLoading ? (
+                <span className="loading-spinner" aria-label="Calculating price" />
+              ) : (
+                formattedTotal
+              )}
+            </div>
 
             {renderPriceBreakdown()}
 
