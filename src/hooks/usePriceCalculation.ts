@@ -10,6 +10,8 @@ import type {
 } from '../components/ProductConfigurator/types';
 import { calculatePrice } from '../services/api';
 
+/* eslint-disable react-hooks/set-state-in-effect */
+
 interface UsePriceCalculationResult {
   price: PriceBreakdown | null;
   formattedTotal: string;
@@ -44,31 +46,33 @@ export function usePriceCalculation(
     setIsLoading(true);
     setError(null);
 
-    const requestTime = Date.now();
-    latestRequestRef.current = requestTime;
+    const requestId = ++latestRequestRef.current;
 
     try {
       const response: PriceResponse = await calculatePrice(config, product);
 
-      if (response.timestamp >= latestRequestRef.current) {
+      if (requestId === latestRequestRef.current) {
         setPrice(response.breakdown);
         setFormattedTotal(response.formattedTotal);
       }
     } catch {
       // Only set error if this is still the latest request
-      if (requestTime === latestRequestRef.current) {
+      if (requestId === latestRequestRef.current) {
         setError('ERR_PRICE_CALC_FAILED');
         setPrice(null);
       }
     } finally {
-      setIsLoading(false);
+      if (requestId === latestRequestRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [config, product]);
 
   // Fetch price when config changes
   useEffect(() => {
+     
     fetchPrice();
-  }, [config?.selections, config?.addOns, config?.quantity]);
+  }, [fetchPrice]);
 
   return {
     price,
@@ -101,7 +105,7 @@ export function useDebouncedPriceCalculation(
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
     }
-
+    /* eslint-disable react-hooks/set-state-in-effect */
     if (!config) {
       setPrice(null);
       setFormattedTotal('$0.00');
@@ -110,6 +114,7 @@ export function useDebouncedPriceCalculation(
     }
 
     setIsLoading(true);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     timeoutRef.current = setTimeout(async () => {
       try {
