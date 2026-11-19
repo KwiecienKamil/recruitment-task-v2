@@ -48,6 +48,10 @@
   .configurator-layout {
     grid-template-columns: 1fr;
   }
+
+  .configurator-actions {
+    flex-direction: column;
+  }
 }
 
 /* Options Section */

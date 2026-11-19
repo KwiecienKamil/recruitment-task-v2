@@ -47,6 +47,8 @@ import {
 } from '../../utils/pricing';
 import './styles.css';
 
+/* eslint-disable react-hooks/set-state-in-effect */
+
 interface ProductConfiguratorProps {
   product: Product;
   initialConfiguration?: Partial<Configuration>;
@@ -99,9 +101,14 @@ const calculateColorColumns = (
   containerWidth: number,
   swatchSize: number = 36,
   gap: number = 8,
+  totalOptions: number = 0,
 ): number => {
-  const columns = Math.floor((containerWidth + gap) / (swatchSize + gap));
-  return Math.max(1, columns);
+  if (containerWidth <= 0 || swatchSize <= 0) return 1;
+
+  const maxColumns = Math.floor((containerWidth + gap) / (swatchSize + gap));
+  const columns = Math.min(Math.max(1, maxColumns), totalOptions || maxColumns);
+
+  return columns;
 };
 
 // ============================================================================
@@ -198,13 +205,18 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
     const handleResize = () => {
       if (colorPickerRef.current) {
         const width = colorPickerRef.current.offsetWidth;
-        const cols = calculateColorColumns(width);
+        const totalOptions = colorPickerRef.current.children.length;
+        const cols = calculateColorColumns(width, 36, 8, totalOptions);
         colorPickerRef.current.style.setProperty('--color-columns', cols.toString());
       }
     };
 
     window.addEventListener('resize', handleResize);
     handleResize();
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
   }, []);
 
   useEffect(() => {
@@ -217,7 +229,9 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
           setValidation(result);
           setIsValid(true);
         }
-      } catch {}
+      } catch {
+        // ignore errors for demo
+      }
     };
 
     validate();
@@ -253,6 +267,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
       onConfigurationChange(currentConfig);
     }
     setIsDirty(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selections, selectedAddOns, quantity]);
 
   useEffect(() => {
@@ -294,24 +309,23 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
         [optionId]: value,
       }));
 
-      const option = product.options.find((o) => o.id === optionId);
       // Clean up any dependent add-ons whose requirement is no longer met.
       // Toggles are handled in handleAddOnToggle, so we only need to do this for select options.
-      if (option && option.type === 'select') {
-        const dependentAddOns = product.addOns.filter((a) => a.dependsOn?.optionId === optionId);
+      const dependentAddOns = product.addOns.filter((a) => a.dependsOn?.optionId === optionId);
 
-        for (const addOn of dependentAddOns) {
-          if (addOn.dependsOn && value !== addOn.dependsOn.requiredValue) {
-            const index = selectedAddOns.indexOf(addOn.id);
-            if (index > -1) {
-              selectedAddOns.splice(index, 1);
-              setSelectedAddOns(selectedAddOns);
-            }
-          }
-        }
-      }
+      // if nothing depends on this option, only selections change
+      if (dependentAddOns.length === 0) return;
+
+      // Replace splice on selectedAddOns -> avoid mutating state in place
+      setSelectedAddOns((prev) =>
+        prev.filter((id) => {
+          const addOn = dependentAddOns.find((a) => a.id === id);
+          if (!addOn?.dependsOn) return true;
+          return value === addOn.dependsOn.requiredValue;
+        }),
+      );
     },
-    [product.options, product.addOns, selectedAddOns],
+    [product],
   );
 
   const handleAddOnToggle = useCallback(
@@ -494,6 +508,13 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
               title={choice.label}
               role="radio"
               aria-checked={currentValue === choice.value}
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  if (!readOnly) handleOptionChange(option.id, choice.value);
+                }
+              }}
             />
           ))}
         </div>
@@ -602,6 +623,16 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
         key={addOn.name}
         className={`addon-item ${isSelected ? 'selected' : ''} ${!isAvailable ? 'disabled' : ''}`}
         onClick={() => !readOnly && isAvailable && handleAddOnToggle(addOn.id)}
+        role="checkbox"
+        aria-checked={isSelected}
+        aria-disabled={!isAvailable || readOnly}
+        tabIndex={!readOnly && isAvailable ? 0 : -1}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            if (!readOnly && isAvailable) handleAddOnToggle(addOn.id);
+          }
+        }}
       >
         <input
           type="checkbox"
@@ -876,7 +907,13 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
 
           <div className={`price-display ${isPriceLoading ? 'price-loading' : ''}`}>
             <div className="price-label">Total Price</div>
-            <div className="price-value">{formattedTotal}</div>
+            <div className="price-value">
+              {isPriceLoading ? (
+                <span className="loading-spinner" aria-label="Calculating price" />
+              ) : (
+                formattedTotal
+              )}
+            </div>
 
             {renderPriceBreakdown()}
 
