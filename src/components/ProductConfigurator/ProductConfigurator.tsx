@@ -502,6 +502,13 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
               title={choice.label}
               role="radio"
               aria-checked={currentValue === choice.value}
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  if (!readOnly) handleOptionChange(option.id, choice.value);
+                }
+              }}
             />
           ))}
         </div>
@@ -610,6 +617,16 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
         key={addOn.name}
         className={`addon-item ${isSelected ? 'selected' : ''} ${!isAvailable ? 'disabled' : ''}`}
         onClick={() => !readOnly && isAvailable && handleAddOnToggle(addOn.id)}
+        role="checkbox"
+        aria-checked={isSelected}
+        aria-disabled={!isAvailable || readOnly}
+        tabIndex={!readOnly && isAvailable ? 0 : -1}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            if (!readOnly && isAvailable) handleAddOnToggle(addOn.id);
+          }
+        }}
       >
         <input
           type="checkbox"
