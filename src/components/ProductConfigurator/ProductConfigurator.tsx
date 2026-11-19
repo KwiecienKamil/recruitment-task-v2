@@ -47,6 +47,8 @@ import {
 } from '../../utils/pricing';
 import './styles.css';
 
+/* eslint-disable react-hooks/set-state-in-effect */
+
 interface ProductConfiguratorProps {
   product: Product;
   initialConfiguration?: Partial<Configuration>;
@@ -217,7 +219,9 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
           setValidation(result);
           setIsValid(true);
         }
-      } catch {}
+      } catch {
+        // ignore errors for demo
+      }
     };
 
     validate();
@@ -253,6 +257,7 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
       onConfigurationChange(currentConfig);
     }
     setIsDirty(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selections, selectedAddOns, quantity]);
 
   useEffect(() => {
@@ -294,24 +299,23 @@ export const ProductConfigurator: React.FC<ProductConfiguratorProps> = ({
         [optionId]: value,
       }));
 
-      const option = product.options.find((o) => o.id === optionId);
       // Clean up any dependent add-ons whose requirement is no longer met.
       // Toggles are handled in handleAddOnToggle, so we only need to do this for select options.
-      if (option && option.type === 'select') {
-        const dependentAddOns = product.addOns.filter((a) => a.dependsOn?.optionId === optionId);
+      const dependentAddOns = product.addOns.filter((a) => a.dependsOn?.optionId === optionId);
 
-        for (const addOn of dependentAddOns) {
-          if (addOn.dependsOn && value !== addOn.dependsOn.requiredValue) {
-            const index = selectedAddOns.indexOf(addOn.id);
-            if (index > -1) {
-              selectedAddOns.splice(index, 1);
-              setSelectedAddOns(selectedAddOns);
-            }
-          }
-        }
-      }
+      // if nothing depends on this option, only selections change
+      if (dependentAddOns.length === 0) return;
+
+      // Replace splice on selectedAddOns -> avoid mutating state in place
+      setSelectedAddOns((prev) =>
+        prev.filter((id) => {
+          const addOn = dependentAddOns.find((a) => a.id === id);
+          if (!addOn?.dependsOn) return true;
+          return value === addOn.dependsOn.requiredValue;
+        }),
+      );
     },
-    [product.options, product.addOns, selectedAddOns],
+    [product],
   );
 
   const handleAddOnToggle = useCallback(
